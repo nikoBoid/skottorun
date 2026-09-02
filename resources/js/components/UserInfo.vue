@@ -6,11 +6,11 @@ import type { User } from '@/types';
 
 type Props = {
     user: User;
-    showEmail?: boolean;
+    showUsername?: boolean;
 };
 
 const props = withDefaults(defineProps<Props>(), {
-    showEmail: false,
+    showUsername: false,
 });
 
 const { getInitials } = useInitials();
@@ -31,8 +31,10 @@ const showAvatar = computed(
 
     <div class="grid flex-1 text-left text-sm leading-tight">
         <span class="truncate font-medium">{{ user.name }}</span>
-        <span v-if="showEmail" class="truncate text-xs text-muted-foreground">{{
-            user.email
-        }}</span>
+        <span
+            v-if="showUsername"
+            class="truncate text-xs text-muted-foreground"
+            >{{ `@${user.username}` }}</span
+        >
     </div>
 </template>

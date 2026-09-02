@@ -14,7 +14,7 @@ class DashboardController extends Controller
         $user = $request->user();
         $campaign = $this->campaign($request);
         $characters = $campaign->characters()
-            ->with('user:id,name,email')
+            ->with('user:id,name,username')
             ->orderBy('name')
             ->get();
 
@@ -27,18 +27,12 @@ class DashboardController extends Controller
             ->orderBy('name')
             ->get();
 
-        $relics = $user->isDungeonMaster()
-            ? $campaign->relics()
+        $relics = $selectedCharacter
+            ? $selectedCharacter->relics()
                 ->with(['character:id,name', 'revelations'])
-                ->orderByRaw('character_id IS NOT NULL')
                 ->latest()
                 ->get()
-            : ($selectedCharacter
-                ? $selectedCharacter->relics()
-                    ->with('revelations')
-                    ->latest()
-                    ->get()
-                : collect());
+            : collect();
 
         if (! $user->isDungeonMaster()) {
             $relics->each(function ($relic): void {

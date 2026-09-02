@@ -23,14 +23,14 @@ class RelicManagementTest extends TestCase
         [, $dm, $player] = $this->campaignWithPlayer();
 
         $this->actingAs($player)
-            ->post(route('relics.store'), [
+            ->post(route('dm.relics.store'), [
                 'name' => 'Occhio di onice',
                 'description' => 'Una sfera fredda e perfettamente liscia.',
             ])
             ->assertForbidden();
 
         $this->actingAs($dm)
-            ->post(route('relics.store'), [
+            ->post(route('dm.relics.store'), [
                 'character_id' => null,
                 'name' => 'Occhio di onice',
                 'description' => 'Una sfera fredda e perfettamente liscia.',
@@ -76,7 +76,7 @@ class RelicManagementTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->has('relics', 0));
 
         $this->actingAs($dm)
-            ->patch(route('relics.update', $relic), ['character_id' => $character->id])
+            ->patch(route('dm.relics.update', $relic), ['character_id' => $character->id])
             ->assertSessionHasNoErrors();
 
         $this->actingAs($player)
@@ -109,11 +109,11 @@ class RelicManagementTest extends TestCase
                 ->where('relics.0.revelations.0.content', null));
 
         $this->actingAs($player)
-            ->patch(route('relic-revelations.update', $revelation), ['is_unlocked' => true])
+            ->patch(route('dm.relic-revelations.update', $revelation), ['is_unlocked' => true])
             ->assertForbidden();
 
         $this->actingAs($dm)
-            ->patch(route('relic-revelations.update', $revelation), ['is_unlocked' => true])
+            ->patch(route('dm.relic-revelations.update', $revelation), ['is_unlocked' => true])
             ->assertSessionHasNoErrors();
 
         $this->actingAs($player)
@@ -121,6 +121,44 @@ class RelicManagementTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('relics.0.revelations.0.is_unlocked', true)
                 ->where('relics.0.revelations.0.content', 'Rivela le impronte lasciate dagli spiriti.'));
+    }
+
+    public function test_dm_can_edit_relic_and_sync_revelations_without_resetting_unlocks(): void
+    {
+        [$campaign, $dm, , $character] = $this->campaignWithPlayer();
+        $relic = $campaign->relics()->create([
+            'character_id' => $character->id,
+            'name' => 'Vecchio nome',
+            'created_by' => $dm->id,
+        ]);
+        $kept = $relic->revelations()->create([
+            'kind' => 'skill',
+            'title' => 'Segreto noto',
+            'content' => 'Contenuto',
+            'is_unlocked' => true,
+            'sort_order' => 0,
+        ]);
+        $removed = $relic->revelations()->create([
+            'kind' => 'lore',
+            'title' => 'Da rimuovere',
+            'content' => 'Contenuto',
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($dm)
+            ->patch(route('dm.relics.update', $relic), [
+                'name' => 'Nuovo nome',
+                'description' => 'Nuova descrizione',
+                'revelations' => [
+                    ['id' => $kept->id, 'kind' => 'skill', 'title' => 'Segreto aggiornato', 'content' => 'Nuovo contenuto'],
+                    ['kind' => 'lore', 'title' => 'Nuovo segreto', 'content' => 'Ancora sigillato'],
+                ],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('relic_revelations', ['id' => $kept->id, 'is_unlocked' => true, 'title' => 'Segreto aggiornato']);
+        $this->assertDatabaseMissing('relic_revelations', ['id' => $removed->id]);
+        $this->assertDatabaseHas('relic_revelations', ['relic_id' => $relic->id, 'title' => 'Nuovo segreto', 'is_unlocked' => false]);
     }
 
     /**

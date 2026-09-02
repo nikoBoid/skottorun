@@ -10,14 +10,29 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+use Inertia\Response;
 use Throwable;
 
 class RelicController extends Controller
 {
+    public function index(Request $request): Response
+    {
+        $campaign = $this->campaign($request);
+
+        return Inertia::render('Dm/Relics', [
+            'campaign' => $campaign->only('id', 'name'),
+            'players' => $campaign->characters()->orderBy('name')->get(['id', 'name']),
+            'relics' => $campaign->relics()
+                ->with(['character:id,name', 'revelations'])
+                ->orderByRaw('character_id IS NOT NULL')
+                ->latest()
+                ->get(),
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
-        abort_unless($request->user()->isDungeonMaster(), 403);
-
         $campaign = $this->campaign($request);
         $data = $request->validate([
             'character_id' => [
@@ -71,8 +86,6 @@ class RelicController extends Controller
 
     public function update(Request $request, Relic $relic): RedirectResponse
     {
-        abort_unless($request->user()->isDungeonMaster(), 403);
-
         $campaign = $this->campaign($request);
         abort_unless($relic->campaign_id === $campaign->id, 404);
 
@@ -86,17 +99,63 @@ class RelicController extends Controller
             'name' => ['sometimes', 'required', 'string', 'max:120'],
             'description' => ['sometimes', 'nullable', 'string', 'max:3000'],
             'image' => ['sometimes', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'remove_image' => ['sometimes', 'boolean'],
+            'revelations' => ['sometimes', 'array', 'max:20'],
+            'revelations.*.id' => [
+                'nullable',
+                'integer',
+                'distinct',
+                Rule::exists('relic_revelations', 'id')->where('relic_id', $relic->id),
+            ],
+            'revelations.*.kind' => ['required_with:revelations', Rule::in(['skill', 'lore'])],
+            'revelations.*.title' => ['required_with:revelations', 'string', 'max:120'],
+            'revelations.*.content' => ['required_with:revelations', 'string', 'max:3000'],
         ]);
 
         $oldImagePath = $relic->image_path;
+        $newImagePath = null;
         if ($request->hasFile('image')) {
-            $data['image_path'] = $request->file('image')->store('relics', 'public');
+            $newImagePath = $request->file('image')->store('relics', 'public');
+            $data['image_path'] = $newImagePath;
+        } elseif ($data['remove_image'] ?? false) {
+            $data['image_path'] = null;
         }
-        unset($data['image']);
+        $revelations = $data['revelations'] ?? null;
+        unset($data['image'], $data['remove_image'], $data['revelations']);
 
-        $relic->update($data);
+        try {
+            DB::transaction(function () use ($relic, $data, $revelations): void {
+                $relic->update($data);
 
-        if (isset($data['image_path']) && $oldImagePath) {
+                if ($revelations === null) {
+                    return;
+                }
+
+                $keptIds = collect($revelations)->pluck('id')->filter()->values();
+                $relic->revelations()->whereNotIn('id', $keptIds)->delete();
+
+                foreach ($revelations as $order => $revelation) {
+                    $attributes = [
+                        ...Arr::only($revelation, ['kind', 'title', 'content']),
+                        'sort_order' => $order,
+                    ];
+
+                    if (! empty($revelation['id'])) {
+                        $relic->revelations()->whereKey($revelation['id'])->update($attributes);
+                    } else {
+                        $relic->revelations()->create($attributes);
+                    }
+                }
+            });
+        } catch (Throwable $exception) {
+            if ($newImagePath) {
+                Storage::disk('public')->delete($newImagePath);
+            }
+
+            throw $exception;
+        }
+
+        if (array_key_exists('image_path', $data) && $oldImagePath && $oldImagePath !== $data['image_path']) {
             Storage::disk('public')->delete($oldImagePath);
         }
 
@@ -114,8 +173,6 @@ class RelicController extends Controller
 
     public function destroy(Request $request, Relic $relic): RedirectResponse
     {
-        abort_unless($request->user()->isDungeonMaster(), 403);
-
         $campaign = $this->campaign($request);
         abort_unless($relic->campaign_id === $campaign->id, 404);
 

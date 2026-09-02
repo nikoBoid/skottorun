@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'dm@scottorun.local'],
             [
                 'name' => 'Dungeon Master',
+                'username' => 'dm',
                 'password' => $password,
                 'role' => UserRole::DungeonMaster,
                 'email_verified_at' => now(),
@@ -39,9 +40,9 @@ class DatabaseSeeder extends Seeder
         );
 
         $players = [
-            ['name' => 'Nicolò', 'email' => 'nico@scottorun.local', 'character' => 'Theron', 'ancestry' => 'Elfo', 'class' => 'Ranger'],
-            ['name' => 'Giulia', 'email' => 'giulia@scottorun.local', 'character' => 'Mira', 'ancestry' => 'Umana', 'class' => 'Chierica'],
-            ['name' => 'Marco', 'email' => 'marco@scottorun.local', 'character' => 'Brann', 'ancestry' => 'Nano', 'class' => 'Guerriero'],
+            ['name' => 'Nicolò', 'username' => 'nico', 'email' => 'nico@scottorun.local', 'character' => 'Theron', 'ancestry' => 'Elfo', 'class' => 'Ranger'],
+            ['name' => 'Giulia', 'username' => 'giulia', 'email' => 'giulia@scottorun.local', 'character' => 'Mira', 'ancestry' => 'Umana', 'class' => 'Chierica'],
+            ['name' => 'Marco', 'username' => 'marco', 'email' => 'marco@scottorun.local', 'character' => 'Brann', 'ancestry' => 'Nano', 'class' => 'Guerriero'],
         ];
 
         foreach ($players as $index => $playerData) {
@@ -49,6 +50,7 @@ class DatabaseSeeder extends Seeder
                 ['email' => $playerData['email']],
                 [
                     'name' => $playerData['name'],
+                    'username' => $playerData['username'],
                     'password' => $password,
                     'role' => UserRole::Player,
                     'email_verified_at' => now(),

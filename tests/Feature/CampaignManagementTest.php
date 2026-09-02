@@ -40,19 +40,53 @@ class CampaignManagementTest extends TestCase
         [$campaign, $dm] = $this->campaignWithPlayer();
 
         $this->actingAs($dm)
-            ->post(route('players.store'), [
+            ->post(route('dm.players.store'), [
                 'name' => 'Luca',
-                'email' => 'luca@example.com',
+                'username' => 'luca',
                 'password' => 'very-secret',
                 'character_name' => 'Dorian',
                 'ancestry' => 'Umano',
                 'class_name' => 'Bardo',
                 'level' => 4,
+                'is_active' => true,
             ])
             ->assertSessionHasNoErrors();
 
-        $this->assertDatabaseHas('users', ['email' => 'luca@example.com', 'role' => 'player']);
+        $this->assertDatabaseHas('users', ['username' => 'luca', 'role' => 'player']);
         $this->assertDatabaseHas('characters', ['campaign_id' => $campaign->id, 'name' => 'Dorian']);
+    }
+
+    public function test_dm_can_update_credentials_and_deactivate_a_player(): void
+    {
+        [, $dm, $player, $character] = $this->campaignWithPlayer();
+
+        $this->actingAs($dm)
+            ->patch(route('dm.players.update', $character), [
+                'name' => 'Nuovo nome',
+                'username' => 'nuovo-login',
+                'password' => 'new-secret',
+                'character_name' => 'Arannis II',
+                'ancestry' => 'Elfo',
+                'class_name' => 'Esploratore',
+                'level' => 5,
+                'is_active' => false,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $player->id,
+            'username' => 'nuovo-login',
+            'is_active' => false,
+        ]);
+        $this->assertDatabaseHas('characters', ['id' => $character->id, 'name' => 'Arannis II']);
+    }
+
+    public function test_player_cannot_open_or_update_dm_player_management(): void
+    {
+        [, , $player, $character] = $this->campaignWithPlayer();
+
+        $this->actingAs($player)->get(route('dm.players.index'))->assertForbidden();
+        $this->actingAs($player)->patch(route('dm.players.update', $character), [])->assertForbidden();
     }
 
     public function test_player_can_update_shared_inventory(): void

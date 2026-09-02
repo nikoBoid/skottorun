@@ -22,13 +22,12 @@ import {
     Sparkles,
     Trash2,
     UnlockKeyhole,
-    UserPlus,
     Users,
     X,
 } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 
-type UserSummary = { id: number; name: string; email: string };
+type UserSummary = { id: number; name: string; username: string };
 type Character = {
     id: number;
     user_id: number;
@@ -105,7 +104,6 @@ defineOptions({
 });
 
 const activeTab = ref<'inventory' | 'relics' | 'journal'>('inventory');
-const showPlayerForm = ref(false);
 const isDm = computed(() => props.viewer.role === 'dm');
 const connectionStatus = useConnectionStatus();
 
@@ -145,15 +143,6 @@ const journalPageForm = useForm({
     title: '',
     content: '',
     occurred_on: new Date().toISOString().slice(0, 10),
-});
-const playerForm = useForm({
-    name: '',
-    email: '',
-    password: '',
-    character_name: '',
-    ancestry: '',
-    class_name: '',
-    level: 1,
 });
 
 function addInventoryItem() {
@@ -298,16 +287,6 @@ function removeJournalPage(page: JournalPage) {
             onSuccess: closeJournalPage,
         });
     }
-}
-
-function addPlayer() {
-    playerForm.post('/players', {
-        preserveScroll: true,
-        onSuccess: () => {
-            playerForm.reset();
-            showPlayerForm.value = false;
-        },
-    });
 }
 
 function remove(path: string, label: string) {
@@ -477,13 +456,6 @@ const tabs = [
                             >
                         </Link>
                     </div>
-                    <button
-                        type="button"
-                        class="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-700/40 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
-                        @click="showPlayerForm = !showPlayerForm"
-                    >
-                        <UserPlus class="size-4" /> Nuovo player
-                    </button>
                 </div>
 
                 <div
@@ -516,77 +488,6 @@ const tabs = [
             </aside>
 
             <main class="min-w-0">
-                <form
-                    v-if="isDm && showPlayerForm"
-                    class="mb-6 rounded-2xl border border-emerald-800/20 bg-white p-5 shadow-sm dark:border-emerald-300/20 dark:bg-white/5"
-                    @submit.prevent="addPlayer"
-                >
-                    <div class="mb-4 flex items-center justify-between">
-                        <div>
-                            <h2 class="font-serif text-xl font-bold">
-                                Accogli un nuovo avventuriero
-                            </h2>
-                            <p class="text-sm text-stone-500">
-                                Crea account e personaggio con un solo gesto.
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            class="text-sm text-stone-500"
-                            @click="showPlayerForm = false"
-                        >
-                            Chiudi
-                        </button>
-                    </div>
-                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        <label class="field"
-                            ><span>Nome player</span
-                            ><input v-model="playerForm.name" required
-                        /></label>
-                        <label class="field"
-                            ><span>Email</span
-                            ><input
-                                v-model="playerForm.email"
-                                type="email"
-                                required
-                        /></label>
-                        <label class="field"
-                            ><span>Password iniziale</span
-                            ><input
-                                v-model="playerForm.password"
-                                type="password"
-                                minlength="8"
-                                required
-                        /></label>
-                        <label class="field"
-                            ><span>Personaggio</span
-                            ><input
-                                v-model="playerForm.character_name"
-                                required
-                        /></label>
-                        <label class="field"
-                            ><span>Razza</span
-                            ><input v-model="playerForm.ancestry"
-                        /></label>
-                        <label class="field"
-                            ><span>Classe</span
-                            ><input v-model="playerForm.class_name"
-                        /></label>
-                    </div>
-                    <p
-                        v-if="Object.keys(playerForm.errors).length"
-                        class="mt-3 text-sm text-red-700"
-                    >
-                        {{ Object.values(playerForm.errors)[0] }}
-                    </p>
-                    <button
-                        class="primary-button mt-4"
-                        :disabled="playerForm.processing"
-                    >
-                        <UserPlus class="size-4" /> Crea player
-                    </button>
-                </form>
-
                 <div
                     class="mb-5 grid grid-cols-3 gap-2 rounded-2xl border border-stone-200 bg-white p-1.5 shadow-sm dark:border-white/10 dark:bg-white/5"
                 >
@@ -818,7 +719,7 @@ const tabs = [
 
                 <section v-else-if="activeTab === 'relics'" class="space-y-5">
                     <form
-                        v-if="isDm"
+                        v-if="false"
                         class="panel space-y-5"
                         @submit.prevent="addRelic"
                     >
@@ -1009,9 +910,7 @@ const tabs = [
                     </form>
 
                     <div
-                        v-if="
-                            isDm && relics.some((relic) => !relic.character_id)
-                        "
+                        v-if="false"
                         class="flex items-center gap-3 rounded-2xl border border-violet-300/40 bg-violet-50 px-4 py-3 text-sm text-violet-950 dark:bg-violet-950/30 dark:text-violet-100"
                     >
                         <Archive class="size-5 shrink-0" />
@@ -1075,7 +974,7 @@ const tabs = [
                                         </h3>
                                     </div>
                                     <button
-                                        v-if="isDm"
+                                        v-if="false"
                                         type="button"
                                         class="icon-danger"
                                         @click="
@@ -1098,7 +997,7 @@ const tabs = [
                                     }}
                                 </p>
 
-                                <label v-if="isDm" class="field mt-4"
+                                <label v-if="false" class="field mt-4"
                                     ><span>Consegna della reliquia</span
                                     ><select
                                         :value="relic.character_id ?? ''"
@@ -1178,7 +1077,7 @@ const tabs = [
                                                 </h4>
                                             </div>
                                             <button
-                                                v-if="isDm"
+                                                v-if="false"
                                                 type="button"
                                                 class="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold transition"
                                                 :class="
@@ -1235,7 +1134,7 @@ const tabs = [
                         <p>
                             {{
                                 isDm
-                                    ? 'Nessuna reliquia preparata.'
+                                    ? 'Nessuna reliquia affidata a questo personaggio.'
                                     : 'Nessuna reliquia affidata.'
                             }}
                         </p>
