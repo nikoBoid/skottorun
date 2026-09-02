@@ -37,11 +37,11 @@ php artisan reverb:start
 
 Account demo creati dal seeder:
 
-- DM: `dm@scottorun.local`
-- Player: `nico@scottorun.local`, `giulia@scottorun.local`, `marco@scottorun.local`
+- DM: `dm`
+- Player: `nico`, `giulia`, `marco`
 - Password locale: `password`, oppure il valore di `SCOTTORUN_SEED_PASSWORD`
 
-La registrazione pubblica è disabilitata. Il DM crea i player dalla dashboard.
+La registrazione pubblica è disabilitata. Il DM crea e gestisce i player dalla pagina **Personaggi**.
 
 ## Controlli qualità
 
@@ -78,6 +78,12 @@ Al primo avvio le migrazioni partono automaticamente. Crea il DM e la campagna i
 
 ```bash
 docker compose --env-file .env.production -f compose.production.yml exec app php artisan scottorun:bootstrap
+```
+
+Per reimpostare in modo interattivo username e password del DM, senza salvare la password nei file o nella cronologia della shell:
+
+```bash
+docker compose --env-file .env.production -f compose.production.yml exec app php artisan scottorun:set-dm-credentials --username=dm
 ```
 
 Per i deploy successivi, esegui commit e push dalla macchina locale, quindi lancia lo script sul VPS. Lo script accetta soltanto aggiornamenti fast-forward, ricompila le immagini, applica le migrazioni e verifica la pagina di login:
