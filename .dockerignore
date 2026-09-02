@@ -1,0 +1,11 @@
+.git
+.env
+.env.*
+!.env.example
+!.env.production.example
+data
+node_modules
+public/build
+public/storage
+storage/logs/*
+vendor
