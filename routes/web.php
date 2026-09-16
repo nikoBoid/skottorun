@@ -19,6 +19,7 @@ Route::middleware('auth')->group(function () {
         ->only(['store', 'update', 'destroy'])
         ->parameters(['inventory' => 'inventoryItem']);
     Route::post('journal/topics', [JournalTopicController::class, 'store'])->name('journal-topics.store');
+    Route::patch('journal/topics/{journalTopic}', [JournalTopicController::class, 'update'])->name('journal-topics.update');
     Route::delete('journal/topics/{journalTopic}', [JournalTopicController::class, 'destroy'])->name('journal-topics.destroy');
     Route::post('journal/topics/{journalTopic}/pages', [JournalPageController::class, 'store'])->name('journal-pages.store');
     Route::patch('journal/pages/{journalPage}', [JournalPageController::class, 'update'])->name('journal-pages.update');

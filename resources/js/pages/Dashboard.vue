@@ -6,6 +6,7 @@ import {
     ArrowLeft,
     Backpack,
     BookOpenText,
+    Check,
     ChevronRight,
     ChevronDown,
     ChevronUp,
@@ -15,6 +16,7 @@ import {
     Image as ImageIcon,
     Library,
     LockKeyhole,
+    Pencil,
     Plus,
     ScrollText,
     Send,
@@ -139,6 +141,9 @@ const relicForm = useForm({
 const journalTopicForm = useForm({
     title: '',
 });
+const journalTopicEditForm = useForm({
+    title: '',
+});
 const journalPageForm = useForm({
     title: '',
     content: '',
@@ -204,6 +209,7 @@ function setRevelationUnlocked(
 
 const selectedTopicId = ref<number | null>(props.journalTopics[0]?.id ?? null);
 const selectedPageId = ref<number | null>(null);
+const editingTopicId = ref<number | null>(null);
 const selectedJournalTopic = computed(
     () =>
         props.journalTopics.find(
@@ -231,10 +237,18 @@ watch(
             selectedTopicId.value = topics[0]?.id ?? null;
             selectedPageId.value = null;
         }
+
+        if (!topics.some((topic) => topic.id === editingTopicId.value)) {
+            cancelJournalTopicEdit();
+        }
     },
 );
 
 function selectJournalTopic(topicId: number) {
+    if (editingTopicId.value !== topicId) {
+        cancelJournalTopicEdit();
+    }
+
     selectedTopicId.value = topicId;
     selectedPageId.value = null;
 }
@@ -243,6 +257,29 @@ function addJournalTopic() {
     journalTopicForm.post('/journal/topics', {
         preserveScroll: true,
         onSuccess: () => journalTopicForm.reset(),
+    });
+}
+
+function editJournalTopic(topic: JournalTopic) {
+    editingTopicId.value = topic.id;
+    journalTopicEditForm.title = topic.title;
+    journalTopicEditForm.clearErrors();
+}
+
+function cancelJournalTopicEdit() {
+    editingTopicId.value = null;
+    journalTopicEditForm.reset();
+    journalTopicEditForm.clearErrors();
+}
+
+function updateJournalTopic() {
+    if (!editingTopicId.value) {
+        return;
+    }
+
+    journalTopicEditForm.patch(`/journal/topics/${editingTopicId.value}`, {
+        preserveScroll: true,
+        onSuccess: cancelJournalTopicEdit,
     });
 }
 
@@ -1263,13 +1300,70 @@ const tabs = [
                                 <div
                                     class="mb-5 flex items-start justify-between gap-4 border-b border-stone-200 pb-4 dark:border-white/10"
                                 >
-                                    <div>
+                                    <div class="min-w-0 flex-1">
                                         <p
                                             class="mb-1 text-xs font-bold tracking-wider text-sky-700 uppercase dark:text-sky-300"
                                         >
                                             Argomento condiviso
                                         </p>
+                                        <form
+                                            v-if="
+                                                editingTopicId ===
+                                                selectedJournalTopic.id
+                                            "
+                                            class="mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:items-start"
+                                            @submit.prevent="updateJournalTopic"
+                                        >
+                                            <label class="field min-w-0 flex-1">
+                                                <span class="sr-only"
+                                                    >Titolo argomento</span
+                                                >
+                                                <input
+                                                    v-model="
+                                                        journalTopicEditForm.title
+                                                    "
+                                                    maxlength="160"
+                                                    autofocus
+                                                    required
+                                                />
+                                                <span
+                                                    v-if="
+                                                        journalTopicEditForm
+                                                            .errors.title
+                                                    "
+                                                    class="text-xs text-red-700 dark:text-red-300"
+                                                >
+                                                    {{
+                                                        journalTopicEditForm
+                                                            .errors.title
+                                                    }}
+                                                </span>
+                                            </label>
+                                            <div class="flex gap-2">
+                                                <button
+                                                    type="submit"
+                                                    class="secondary-button"
+                                                    :disabled="
+                                                        journalTopicEditForm.processing
+                                                    "
+                                                >
+                                                    <Check class="size-3.5" />
+                                                    Salva
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="secondary-button"
+                                                    @click="
+                                                        cancelJournalTopicEdit
+                                                    "
+                                                >
+                                                    <X class="size-3.5" />
+                                                    Annulla
+                                                </button>
+                                            </div>
+                                        </form>
                                         <h2
+                                            v-else
                                             class="font-serif text-2xl font-bold"
                                         >
                                             {{ selectedJournalTopic.title }}
@@ -1289,18 +1383,33 @@ const tabs = [
                                             }}
                                         </p>
                                     </div>
-                                    <button
-                                        type="button"
-                                        class="icon-danger"
-                                        aria-label="Rimuovi argomento"
-                                        @click="
-                                            removeJournalTopic(
-                                                selectedJournalTopic,
-                                            )
-                                        "
-                                    >
-                                        <Trash2 class="size-4" />
-                                    </button>
+                                    <div class="flex shrink-0 gap-1">
+                                        <button
+                                            type="button"
+                                            class="secondary-button px-2.5"
+                                            aria-label="Modifica argomento"
+                                            title="Modifica argomento"
+                                            @click="
+                                                editJournalTopic(
+                                                    selectedJournalTopic,
+                                                )
+                                            "
+                                        >
+                                            <Pencil class="size-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="icon-danger"
+                                            aria-label="Rimuovi argomento"
+                                            @click="
+                                                removeJournalTopic(
+                                                    selectedJournalTopic,
+                                                )
+                                            "
+                                        >
+                                            <Trash2 class="size-4" />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <article v-if="selectedJournalPage">

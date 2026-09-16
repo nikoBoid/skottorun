@@ -71,6 +71,60 @@ class SharedJournalTest extends TestCase
                 ->where('journalTopics.0.pages.0.title', 'Il drago d’argento'));
     }
 
+    public function test_every_campaign_member_can_rename_a_topic_created_by_someone_else(): void
+    {
+        [$campaign, $firstPlayer, $secondPlayer] = $this->campaignWithTwoPlayers();
+        $topic = $campaign->journalTopics()->create([
+            'created_by' => $firstPlayer->id,
+            'title' => 'Celestiali',
+        ]);
+
+        $this->actingAs($secondPlayer)
+            ->patch(route('journal-topics.update', $topic), [
+                'title' => 'Gerarchie celestiali',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('journal_topics', [
+            'id' => $topic->id,
+            'title' => 'Gerarchie celestiali',
+        ]);
+
+        $this->actingAs($campaign->dungeonMaster)
+            ->patch(route('journal-topics.update', $topic), [
+                'title' => 'Celestiali e arconti',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('journal_topics', [
+            'id' => $topic->id,
+            'title' => 'Celestiali e arconti',
+        ]);
+    }
+
+    public function test_member_cannot_rename_another_campaign_topic(): void
+    {
+        [, $player] = $this->campaignWithTwoPlayers();
+        $otherDm = User::factory()->create(['role' => UserRole::DungeonMaster]);
+        $otherCampaign = Campaign::query()->create([
+            'dungeon_master_id' => $otherDm->id,
+            'name' => 'Altra campagna',
+            'slug' => 'altra-campagna',
+        ]);
+        $foreignTopic = $otherCampaign->journalTopics()->create([
+            'created_by' => $otherDm->id,
+            'title' => 'Segreti proibiti',
+        ]);
+
+        $this->actingAs($player)
+            ->patch(route('journal-topics.update', $foreignTopic), [
+                'title' => 'Titolo sottratto',
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseMissing('journal_topics', ['title' => 'Titolo sottratto']);
+    }
+
     public function test_player_cannot_add_pages_to_another_campaign_topic(): void
     {
         [, $player] = $this->campaignWithTwoPlayers();

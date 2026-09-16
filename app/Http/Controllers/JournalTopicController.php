@@ -32,6 +32,36 @@ class JournalTopicController extends Controller
         return back()->with('success', 'Argomento creato. Ora puoi aggiungere la prima pagina.');
     }
 
+    public function update(Request $request, JournalTopic $journalTopic): RedirectResponse
+    {
+        $campaign = $this->campaign($request);
+        abort_unless($journalTopic->campaign_id === $campaign->id, 404);
+
+        $data = $request->validate([
+            'title' => [
+                'required',
+                'string',
+                'max:160',
+                Rule::unique('journal_topics', 'title')
+                    ->where('campaign_id', $campaign->id)
+                    ->ignore($journalTopic->id),
+            ],
+        ]);
+
+        $oldTitle = $journalTopic->title;
+        $journalTopic->update($data);
+
+        ActivityLog::record(
+            $campaign,
+            $request->user(),
+            'updated',
+            $journalTopic,
+            "ha rinominato l’argomento «{$oldTitle}» in «{$journalTopic->title}»",
+        );
+
+        return back()->with('success', 'Argomento aggiornato.');
+    }
+
     public function destroy(Request $request, JournalTopic $journalTopic): RedirectResponse
     {
         $campaign = $this->campaign($request);
