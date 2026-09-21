@@ -2,6 +2,8 @@
 
 Web app personale per gestire una campagna di D&D durante le sessioni. Il Dungeon Master amministra la compagnia; i player condividono sia lo zaino sia il diario organizzato per argomenti e pagine.
 
+Ogni personaggio dispone inoltre di una scheda PDF compilabile privata: il player può modificarla e salvarla dal browser, mentre il DM può consultarla dal tavolo di gioco.
+
 Le reliquie vengono preparate esclusivamente dal DM, anche senza assegnarle subito. Possono avere un’immagine e contenuti aggiuntivi sigillati: abilità e parti di storia diventano leggibili dal player solo quando il DM le sblocca.
 
 ## Stack
@@ -97,7 +99,7 @@ Configura Caddy sulla rete `climb_edge`; WebSocket e header proxy vengono gestit
 
 La configurazione usata sul server è conservata in `deploy/Caddyfile.scottorun`.
 
-I dati persistenti sono in `data/database` e `data/storage`. Lo script `deploy/backup-production.sh` crea una copia consistente di SQLite, archivia gli upload e conserva 30 giorni di backup in `/opt/scottorun-backups`. I file systemd inclusi lo eseguono ogni giorno alle 03:30, ora italiana.
+I dati persistenti sono in `data/database` e `data/storage`. Lo script `deploy/backup-production.sh` crea una copia consistente di SQLite, archivia gli upload pubblici e le schede PDF private e conserva 30 giorni di backup in `/opt/scottorun-backups`. I file systemd inclusi lo eseguono ogni giorno alle 03:30, ora italiana.
 
 ## Realtime
 

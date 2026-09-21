@@ -11,11 +11,14 @@ import {
     ChevronDown,
     ChevronUp,
     Crown,
+    FileText,
     Gem,
     History,
     Image as ImageIcon,
     Library,
     LockKeyhole,
+    Minus,
+    Moon,
     Pencil,
     Plus,
     ScrollText,
@@ -24,10 +27,13 @@ import {
     Sparkles,
     Trash2,
     UnlockKeyhole,
+    Upload,
+    Utensils,
     Users,
     X,
 } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
+import CharacterSheetViewer from '@/components/CharacterSheetViewer.vue';
 
 type UserSummary = { id: number; name: string; username: string };
 type Character = {
@@ -78,6 +84,19 @@ type JournalTopic = {
     pages: JournalPage[];
     creator?: UserSummary | null;
 };
+type GalleryImage = {
+    id: number;
+    image_url: string;
+};
+type CharacterSheet = {
+    character_id: number;
+    character_name: string;
+    url: string;
+    download_url: string;
+    save_url: string;
+    can_edit: boolean;
+    updated_at: string | null;
+};
 type Activity = {
     id: number;
     description: string;
@@ -98,6 +117,9 @@ const props = defineProps<{
     inventory: InventoryItem[];
     relics: Relic[];
     journalTopics: JournalTopic[];
+    galleryImages: GalleryImage[];
+    rationCount: number;
+    characterSheet: CharacterSheet | null;
     activity: Activity[];
 }>();
 
@@ -105,7 +127,10 @@ defineOptions({
     layout: { breadcrumbs: [{ title: 'Tavolo di gioco', href: '/dashboard' }] },
 });
 
-const activeTab = ref<'inventory' | 'relics' | 'journal'>('inventory');
+const activeTab = ref<
+    'inventory' | 'relics' | 'journal' | 'gallery' | 'rations' | 'sheet'
+>('inventory');
+const characterSheetDirty = ref(false);
 const isDm = computed(() => props.viewer.role === 'dm');
 const connectionStatus = useConnectionStatus();
 
@@ -114,7 +139,15 @@ useEcho<{ campaignId: number; area: string }>(
     'CampaignChanged',
     () => {
         router.reload({
-            only: ['inventory', 'relics', 'journalTopics', 'activity'],
+            only: [
+                'inventory',
+                'relics',
+                'journalTopics',
+                'galleryImages',
+                'rationCount',
+                'characterSheet',
+                'activity',
+            ],
         });
     },
 );
@@ -149,6 +182,18 @@ const journalPageForm = useForm({
     content: '',
     occurred_on: new Date().toISOString().slice(0, 10),
 });
+const journalPageEditForm = useForm({
+    title: '',
+    content: '',
+    occurred_on: '',
+});
+const galleryForm = useForm({
+    image: null as File | null,
+});
+const rationForm = useForm({
+    quantity: props.rationCount,
+});
+const rationRestForm = useForm({ rations: null as string | null });
 
 function addInventoryItem() {
     inventoryForm.post('/inventory', {
@@ -210,6 +255,7 @@ function setRevelationUnlocked(
 const selectedTopicId = ref<number | null>(props.journalTopics[0]?.id ?? null);
 const selectedPageId = ref<number | null>(null);
 const editingTopicId = ref<number | null>(null);
+const editingPageId = ref<number | null>(null);
 const selectedJournalTopic = computed(
     () =>
         props.journalTopics.find(
@@ -241,6 +287,14 @@ watch(
         if (!topics.some((topic) => topic.id === editingTopicId.value)) {
             cancelJournalTopicEdit();
         }
+
+        if (
+            !topics.some((topic) =>
+                topic.pages.some((page) => page.id === editingPageId.value),
+            )
+        ) {
+            cancelJournalPageEdit();
+        }
     },
 );
 
@@ -249,6 +303,7 @@ function selectJournalTopic(topicId: number) {
         cancelJournalTopicEdit();
     }
 
+    cancelJournalPageEdit();
     selectedTopicId.value = topicId;
     selectedPageId.value = null;
 }
@@ -298,11 +353,41 @@ function addJournalPage() {
 }
 
 function openJournalPage(pageId: number) {
+    if (editingPageId.value !== pageId) {
+        cancelJournalPageEdit();
+    }
+
     selectedPageId.value = pageId;
 }
 
 function closeJournalPage() {
+    cancelJournalPageEdit();
     selectedPageId.value = null;
+}
+
+function editJournalPage(page: JournalPage) {
+    editingPageId.value = page.id;
+    journalPageEditForm.title = page.title;
+    journalPageEditForm.content = page.content;
+    journalPageEditForm.occurred_on = page.occurred_on?.slice(0, 10) ?? '';
+    journalPageEditForm.clearErrors();
+}
+
+function cancelJournalPageEdit() {
+    editingPageId.value = null;
+    journalPageEditForm.reset();
+    journalPageEditForm.clearErrors();
+}
+
+function updateJournalPage() {
+    if (!editingPageId.value) {
+        return;
+    }
+
+    journalPageEditForm.patch(`/journal/pages/${editingPageId.value}`, {
+        preserveScroll: true,
+        onSuccess: cancelJournalPageEdit,
+    });
 }
 
 function removeJournalTopic(topic: JournalTopic) {
@@ -326,6 +411,51 @@ function removeJournalPage(page: JournalPage) {
     }
 }
 
+function setGalleryImage(event: Event) {
+    galleryForm.image =
+        (event.target as HTMLInputElement).files?.item(0) ?? null;
+}
+
+function addGalleryImage() {
+    galleryForm.post('/gallery', {
+        preserveScroll: true,
+        forceFormData: true,
+        onSuccess: () => galleryForm.reset(),
+    });
+}
+
+function removeGalleryImage(galleryImage: GalleryImage) {
+    if (window.confirm('Rimuovere questa immagine dalla galleria?')) {
+        router.delete(`/gallery/${galleryImage.id}`, { preserveScroll: true });
+    }
+}
+
+function updateRations() {
+    rationForm.patch('/rations', { preserveScroll: true });
+}
+
+function changeRations(delta: number) {
+    rationForm.quantity = Math.max(0, props.rationCount + delta);
+    updateRations();
+}
+
+function restCompany() {
+    rationRestForm.post('/rations/rest', { preserveScroll: true });
+}
+
+function selectTab(tabId: (typeof tabs)[number]['id']) {
+    if (
+        activeTab.value === 'sheet' &&
+        characterSheetDirty.value &&
+        tabId !== 'sheet' &&
+        !window.confirm('Uscire senza salvare le modifiche alla scheda?')
+    ) {
+        return;
+    }
+
+    activeTab.value = tabId;
+}
+
 function remove(path: string, label: string) {
     if (window.confirm(`Rimuovere ${label}?`)) {
         router.delete(path, { preserveScroll: true });
@@ -344,10 +474,20 @@ function formatDate(value: string | null) {
     }).format(new Date(value));
 }
 
+watch(
+    () => props.rationCount,
+    (rationCount) => {
+        rationForm.quantity = rationCount;
+    },
+);
+
 const tabs = [
     { id: 'inventory' as const, label: 'Zaino condiviso', icon: Backpack },
     { id: 'relics' as const, label: 'Reliquie', icon: Gem },
     { id: 'journal' as const, label: 'Diario', icon: BookOpenText },
+    { id: 'gallery' as const, label: 'Galleria', icon: ImageIcon },
+    { id: 'rations' as const, label: 'Razioni', icon: Utensils },
+    { id: 'sheet' as const, label: 'Scheda PG', icon: FileText },
 ];
 </script>
 
@@ -526,19 +666,21 @@ const tabs = [
 
             <main class="min-w-0">
                 <div
-                    class="mb-5 grid grid-cols-3 gap-2 rounded-2xl border border-stone-200 bg-white p-1.5 shadow-sm dark:border-white/10 dark:bg-white/5"
+                    class="mb-5 grid grid-cols-6 gap-1 rounded-2xl border border-stone-200 bg-white p-1.5 shadow-sm sm:gap-2 dark:border-white/10 dark:bg-white/5"
                 >
                     <button
                         v-for="tab in tabs"
                         :key="tab.id"
                         type="button"
+                        :aria-label="tab.label"
+                        :title="tab.label"
                         class="flex items-center justify-center gap-2 rounded-xl px-2 py-3 text-xs font-bold transition sm:text-sm"
                         :class="
                             activeTab === tab.id
                                 ? 'bg-emerald-800 text-white shadow-sm'
                                 : 'text-stone-500 hover:bg-stone-100 dark:hover:bg-white/10'
                         "
-                        @click="activeTab = tab.id"
+                        @click="selectTab(tab.id)"
                     >
                         <component :is="tab.icon" class="size-4" /><span
                             class="hidden sm:inline"
@@ -1182,7 +1324,7 @@ const tabs = [
                     </div>
                 </section>
 
-                <section v-else class="space-y-5">
+                <section v-else-if="activeTab === 'journal'" class="space-y-5">
                     <div
                         class="flex flex-col gap-3 rounded-2xl border border-sky-800/15 bg-sky-950 px-5 py-4 text-white shadow-sm sm:flex-row sm:items-center sm:justify-between"
                     >
@@ -1425,54 +1567,148 @@ const tabs = [
                                         <ArrowLeft class="size-3.5" /> Torna
                                         all’indice
                                     </button>
-                                    <div
-                                        class="flex items-start justify-between gap-4"
+                                    <form
+                                        v-if="
+                                            editingPageId ===
+                                            selectedJournalPage.id
+                                        "
+                                        class="space-y-4"
+                                        @submit.prevent="updateJournalPage"
                                     >
-                                        <div>
-                                            <p
-                                                class="mb-1 text-xs font-semibold tracking-wider text-amber-700 uppercase"
-                                            >
-                                                {{
-                                                    formatDate(
-                                                        selectedJournalPage.occurred_on ||
-                                                            selectedJournalPage.created_at,
-                                                    )
-                                                }}
-                                            </p>
-                                            <h3
-                                                class="font-serif text-xl font-bold"
-                                            >
-                                                {{ selectedJournalPage.title }}
-                                            </h3>
+                                        <div class="grid gap-3 sm:grid-cols-2">
+                                            <label class="field">
+                                                <span>Titolo pagina</span>
+                                                <input
+                                                    v-model="
+                                                        journalPageEditForm.title
+                                                    "
+                                                    maxlength="160"
+                                                    autofocus
+                                                    required
+                                                />
+                                            </label>
+                                            <label class="field">
+                                                <span>Data nel mondo</span>
+                                                <input
+                                                    v-model="
+                                                        journalPageEditForm.occurred_on
+                                                    "
+                                                    type="date"
+                                                />
+                                            </label>
+                                            <label class="field sm:col-span-2">
+                                                <span>Contenuto</span>
+                                                <textarea
+                                                    v-model="
+                                                        journalPageEditForm.content
+                                                    "
+                                                    rows="10"
+                                                    maxlength="20000"
+                                                    required
+                                                ></textarea>
+                                            </label>
                                         </div>
-                                        <button
-                                            type="button"
-                                            class="icon-danger"
-                                            aria-label="Rimuovi pagina"
-                                            @click="
-                                                removeJournalPage(
-                                                    selectedJournalPage,
-                                                )
+                                        <p
+                                            v-if="
+                                                Object.keys(
+                                                    journalPageEditForm.errors,
+                                                ).length
                                             "
+                                            class="text-sm text-red-700 dark:text-red-300"
                                         >
-                                            <Trash2 class="size-4" />
-                                        </button>
-                                    </div>
-                                    <p
-                                        class="mt-4 text-sm leading-7 whitespace-pre-wrap text-stone-600 dark:text-stone-300"
-                                    >
-                                        {{ selectedJournalPage.content }}
-                                    </p>
-                                    <div
-                                        class="mt-5 flex items-center gap-2 border-t border-stone-200 pt-3 text-xs text-stone-400 dark:border-white/10"
-                                    >
-                                        <ScrollText class="size-3.5" />
-                                        Scritta da
-                                        {{
-                                            selectedJournalPage.author?.name ||
-                                            'autore ignoto'
-                                        }}
-                                    </div>
+                                            {{
+                                                Object.values(
+                                                    journalPageEditForm.errors,
+                                                )[0]
+                                            }}
+                                        </p>
+                                        <div class="flex flex-wrap gap-2">
+                                            <button
+                                                type="submit"
+                                                class="primary-button"
+                                                :disabled="
+                                                    journalPageEditForm.processing
+                                                "
+                                            >
+                                                <Check class="size-4" /> Salva
+                                                modifiche
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="secondary-button"
+                                                @click="cancelJournalPageEdit"
+                                            >
+                                                <X class="size-4" /> Annulla
+                                            </button>
+                                        </div>
+                                    </form>
+                                    <template v-else>
+                                        <div
+                                            class="flex items-start justify-between gap-4"
+                                        >
+                                            <div class="min-w-0 flex-1">
+                                                <p
+                                                    class="mb-1 text-xs font-semibold tracking-wider text-amber-700 uppercase"
+                                                >
+                                                    {{
+                                                        formatDate(
+                                                            selectedJournalPage.occurred_on ||
+                                                                selectedJournalPage.created_at,
+                                                        )
+                                                    }}
+                                                </p>
+                                                <h3
+                                                    class="font-serif text-xl font-bold"
+                                                >
+                                                    {{
+                                                        selectedJournalPage.title
+                                                    }}
+                                                </h3>
+                                            </div>
+                                            <div class="flex shrink-0 gap-1">
+                                                <button
+                                                    type="button"
+                                                    class="secondary-button px-2.5"
+                                                    aria-label="Modifica pagina"
+                                                    title="Modifica pagina"
+                                                    @click="
+                                                        editJournalPage(
+                                                            selectedJournalPage,
+                                                        )
+                                                    "
+                                                >
+                                                    <Pencil class="size-4" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="icon-danger"
+                                                    aria-label="Rimuovi pagina"
+                                                    @click="
+                                                        removeJournalPage(
+                                                            selectedJournalPage,
+                                                        )
+                                                    "
+                                                >
+                                                    <Trash2 class="size-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p
+                                            class="mt-4 text-sm leading-7 whitespace-pre-wrap text-stone-600 dark:text-stone-300"
+                                        >
+                                            {{ selectedJournalPage.content }}
+                                        </p>
+                                        <div
+                                            class="mt-5 flex items-center gap-2 border-t border-stone-200 pt-3 text-xs text-stone-400 dark:border-white/10"
+                                        >
+                                            <ScrollText class="size-3.5" />
+                                            Scritta da
+                                            {{
+                                                selectedJournalPage.author
+                                                    ?.name || 'autore ignoto'
+                                            }}
+                                        </div>
+                                    </template>
                                 </article>
 
                                 <div
@@ -1611,6 +1847,224 @@ const tabs = [
                                 >
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                <section
+                    v-else-if="activeTab === 'gallery'"
+                    class="mx-auto max-w-3xl space-y-5"
+                >
+                    <form class="panel" @submit.prevent="addGalleryImage">
+                        <div
+                            class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <div>
+                                <h2 class="font-serif text-xl font-bold">
+                                    Galleria della compagnia
+                                </h2>
+                                <p class="mt-1 text-sm text-stone-500">
+                                    Carica un’immagine da condividere con tutto
+                                    il tavolo.
+                                </p>
+                            </div>
+                            <label
+                                class="secondary-button cursor-pointer justify-center"
+                            >
+                                <ImageIcon class="size-4" />
+                                {{
+                                    galleryForm.image?.name || 'Scegli immagine'
+                                }}
+                                <input
+                                    class="sr-only"
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp,image/gif"
+                                    required
+                                    @change="setGalleryImage"
+                                />
+                            </label>
+                        </div>
+                        <p
+                            v-if="galleryForm.errors.image"
+                            class="mt-3 text-sm text-red-700 dark:text-red-300"
+                        >
+                            {{ galleryForm.errors.image }}
+                        </p>
+                        <button
+                            class="primary-button mt-4"
+                            :disabled="
+                                galleryForm.processing || !galleryForm.image
+                            "
+                        >
+                            <Upload class="size-4" /> Carica nella galleria
+                        </button>
+                    </form>
+
+                    <div v-if="galleryImages.length" class="space-y-5">
+                        <figure
+                            v-for="galleryImage in galleryImages"
+                            :key="galleryImage.id"
+                            class="group relative overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/5"
+                        >
+                            <img
+                                :src="galleryImage.image_url"
+                                alt=""
+                                class="block h-auto w-full"
+                                loading="lazy"
+                            />
+                            <button
+                                type="button"
+                                class="absolute top-3 right-3 grid size-10 place-items-center rounded-xl bg-black/60 text-white opacity-100 shadow-sm backdrop-blur transition hover:bg-red-700 sm:opacity-0 sm:group-hover:opacity-100"
+                                aria-label="Rimuovi immagine"
+                                @click="removeGalleryImage(galleryImage)"
+                            >
+                                <Trash2 class="size-4" />
+                            </button>
+                        </figure>
+                    </div>
+                    <div v-else class="panel empty-state">
+                        <ImageIcon class="size-8" />
+                        <p>La galleria è ancora vuota.</p>
+                        <span>La prima immagine può caricarla chiunque.</span>
+                    </div>
+                </section>
+
+                <section
+                    v-else-if="activeTab === 'rations'"
+                    class="mx-auto max-w-2xl space-y-5"
+                >
+                    <div class="panel text-center">
+                        <span
+                            class="mx-auto grid size-14 place-items-center rounded-2xl bg-amber-100 text-amber-800 dark:bg-amber-300/10 dark:text-amber-300"
+                        >
+                            <Utensils class="size-7" />
+                        </span>
+                        <p
+                            class="mt-5 text-xs font-bold tracking-[0.2em] text-stone-500 uppercase"
+                        >
+                            Razioni disponibili
+                        </p>
+                        <strong
+                            class="mt-2 block font-serif text-7xl leading-none text-emerald-900 dark:text-emerald-200"
+                        >
+                            {{ rationCount }}
+                        </strong>
+
+                        <div
+                            class="mt-6 flex items-center justify-center gap-3"
+                        >
+                            <button
+                                type="button"
+                                class="secondary-button size-11 justify-center p-0"
+                                aria-label="Togli una razione"
+                                :disabled="
+                                    rationForm.processing || rationCount === 0
+                                "
+                                @click="changeRations(-1)"
+                            >
+                                <Minus class="size-4" />
+                            </button>
+                            <button
+                                type="button"
+                                class="secondary-button size-11 justify-center p-0"
+                                aria-label="Aggiungi una razione"
+                                :disabled="rationForm.processing"
+                                @click="changeRations(1)"
+                            >
+                                <Plus class="size-4" />
+                            </button>
+                        </div>
+
+                        <form
+                            class="mx-auto mt-5 flex max-w-xs gap-2"
+                            @submit.prevent="updateRations"
+                        >
+                            <label class="field min-w-0 flex-1 text-left">
+                                <span>Imposta quantità</span>
+                                <input
+                                    v-model.number="rationForm.quantity"
+                                    type="number"
+                                    min="0"
+                                    max="99999"
+                                    required
+                                />
+                            </label>
+                            <button
+                                class="secondary-button mt-5"
+                                :disabled="rationForm.processing"
+                            >
+                                <Check class="size-4" /> Salva
+                            </button>
+                        </form>
+                        <p
+                            v-if="rationForm.errors.quantity"
+                            class="mt-2 text-sm text-red-700 dark:text-red-300"
+                        >
+                            {{ rationForm.errors.quantity }}
+                        </p>
+                    </div>
+
+                    <div
+                        class="rounded-2xl border border-emerald-800/15 bg-emerald-950 p-5 text-white shadow-sm"
+                    >
+                        <div
+                            class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <div class="flex items-start gap-3">
+                                <span
+                                    class="grid size-11 shrink-0 place-items-center rounded-xl bg-amber-300 text-emerald-950"
+                                >
+                                    <Moon class="size-5" />
+                                </span>
+                                <div>
+                                    <h2 class="font-serif text-lg font-bold">
+                                        Riposo della compagnia
+                                    </h2>
+                                    <p class="mt-1 text-sm text-emerald-100/75">
+                                        Consuma 4 razioni: una per ciascun
+                                        personaggio.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-300 px-4 py-2.5 text-sm font-bold text-emerald-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                :disabled="
+                                    rationRestForm.processing || rationCount < 4
+                                "
+                                @click="restCompany"
+                            >
+                                <Moon class="size-4" /> Dormi · −4
+                            </button>
+                        </div>
+                        <p
+                            v-if="rationRestForm.errors['rations']"
+                            class="mt-3 text-sm text-red-200"
+                        >
+                            {{ rationRestForm.errors['rations'] }}
+                        </p>
+                        <p
+                            v-else-if="rationCount < 4"
+                            class="mt-3 text-sm text-amber-200"
+                        >
+                            Non ci sono abbastanza razioni per tutti.
+                        </p>
+                    </div>
+                </section>
+
+                <section v-else-if="activeTab === 'sheet'">
+                    <CharacterSheetViewer
+                        v-if="characterSheet"
+                        :source-url="characterSheet.url"
+                        :save-url="characterSheet.save_url"
+                        :download-url="characterSheet.download_url"
+                        :character-name="characterSheet.character_name"
+                        :can-edit="characterSheet.can_edit"
+                        :updated-at="characterSheet.updated_at"
+                        @dirty-change="characterSheetDirty = $event"
+                    />
+                    <div v-else class="panel empty-state">
+                        <FileText class="size-8" />
+                        <p>Nessun personaggio selezionato.</p>
                     </div>
                 </section>
             </main>

@@ -11,7 +11,7 @@ class Campaign extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['dungeon_master_id', 'name', 'slug', 'synopsis'];
+    protected $fillable = ['dungeon_master_id', 'name', 'slug', 'synopsis', 'ration_count'];
 
     public function dungeonMaster(): BelongsTo
     {
@@ -36,6 +36,11 @@ class Campaign extends Model
     public function journalTopics(): HasMany
     {
         return $this->hasMany(JournalTopic::class);
+    }
+
+    public function galleryImages(): HasMany
+    {
+        return $this->hasMany(GalleryImage::class);
     }
 
     public function activityLogs(): HasMany

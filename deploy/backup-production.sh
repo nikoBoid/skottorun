@@ -49,7 +49,7 @@ docker compose \
 install -m 0600 "$snapshot_host" "$temp_dir/database.sqlite"
 rm -f "$snapshot_host"
 
-tar -C "$project_dir/data/storage" -czf "$temp_dir/uploads.tar.gz" app/public
+tar -C "$project_dir/data/storage" -czf "$temp_dir/uploads.tar.gz" app
 install -m 0600 "$env_file" "$temp_dir/.env.production"
 
 (

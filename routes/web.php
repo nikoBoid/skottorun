@@ -1,10 +1,13 @@
 <?php
 
+use App\Http\Controllers\CharacterSheetController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GalleryImageController;
 use App\Http\Controllers\InventoryItemController;
 use App\Http\Controllers\JournalPageController;
 use App\Http\Controllers\JournalTopicController;
 use App\Http\Controllers\PlayerController;
+use App\Http\Controllers\RationController;
 use App\Http\Controllers\RelicController;
 use App\Http\Controllers\RelicRevelationController;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +27,13 @@ Route::middleware('auth')->group(function () {
     Route::post('journal/topics/{journalTopic}/pages', [JournalPageController::class, 'store'])->name('journal-pages.store');
     Route::patch('journal/pages/{journalPage}', [JournalPageController::class, 'update'])->name('journal-pages.update');
     Route::delete('journal/pages/{journalPage}', [JournalPageController::class, 'destroy'])->name('journal-pages.destroy');
+    Route::post('gallery', [GalleryImageController::class, 'store'])->name('gallery.store');
+    Route::delete('gallery/{galleryImage}', [GalleryImageController::class, 'destroy'])->name('gallery.destroy');
+    Route::patch('rations', [RationController::class, 'update'])->name('rations.update');
+    Route::post('rations/rest', [RationController::class, 'rest'])->name('rations.rest');
+    Route::get('characters/{character}/sheet', [CharacterSheetController::class, 'show'])->name('character-sheets.show');
+    Route::get('characters/{character}/sheet/download', [CharacterSheetController::class, 'download'])->name('character-sheets.download');
+    Route::post('characters/{character}/sheet', [CharacterSheetController::class, 'update'])->name('character-sheets.update');
 });
 
 Route::middleware(['auth', 'dm'])->prefix('dm')->name('dm.')->group(function () {

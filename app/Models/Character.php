@@ -19,11 +19,16 @@ class Character extends Model
         'class_name',
         'level',
         'avatar',
+        'character_sheet_path',
+        'character_sheet_updated_at',
     ];
 
     protected function casts(): array
     {
-        return ['level' => 'integer'];
+        return [
+            'level' => 'integer',
+            'character_sheet_updated_at' => 'datetime',
+        ];
     }
 
     public function campaign(): BelongsTo

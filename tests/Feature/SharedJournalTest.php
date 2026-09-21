@@ -125,6 +125,87 @@ class SharedJournalTest extends TestCase
         $this->assertDatabaseMissing('journal_topics', ['title' => 'Titolo sottratto']);
     }
 
+    public function test_every_campaign_member_can_edit_a_page_created_by_someone_else(): void
+    {
+        [$campaign, $firstPlayer, $secondPlayer] = $this->campaignWithTwoPlayers();
+        $topic = $campaign->journalTopics()->create([
+            'created_by' => $firstPlayer->id,
+            'title' => 'Celestiali',
+        ]);
+        $journalPage = $topic->pages()->create([
+            'author_id' => $firstPlayer->id,
+            'title' => 'Gerarchie del cielo',
+            'content' => 'Gli arconti custodiscono le soglie superiori.',
+            'occurred_on' => '2026-08-20',
+        ]);
+
+        $this->actingAs($secondPlayer)
+            ->patch(route('journal-pages.update', $journalPage), [
+                'title' => 'Gerarchie celestiali',
+                'content' => 'Gli arconti e i deva custodiscono le soglie superiori.',
+                'occurred_on' => '2026-08-21',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('journal_pages', [
+            'id' => $journalPage->id,
+            'author_id' => $firstPlayer->id,
+            'title' => 'Gerarchie celestiali',
+            'content' => 'Gli arconti e i deva custodiscono le soglie superiori.',
+            'occurred_on' => '2026-08-21 00:00:00',
+        ]);
+
+        $this->actingAs($campaign->dungeonMaster)
+            ->patch(route('journal-pages.update', $journalPage), [
+                'title' => 'Arconti e deva',
+                'content' => 'Appunti aggiornati dal dungeon master.',
+                'occurred_on' => null,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('journal_pages', [
+            'id' => $journalPage->id,
+            'author_id' => $firstPlayer->id,
+            'title' => 'Arconti e deva',
+            'content' => 'Appunti aggiornati dal dungeon master.',
+            'occurred_on' => null,
+        ]);
+    }
+
+    public function test_member_cannot_edit_a_page_from_another_campaign(): void
+    {
+        [, $player] = $this->campaignWithTwoPlayers();
+        $otherDm = User::factory()->create(['role' => UserRole::DungeonMaster]);
+        $otherCampaign = Campaign::query()->create([
+            'dungeon_master_id' => $otherDm->id,
+            'name' => 'Altra campagna',
+            'slug' => 'altra-campagna',
+        ]);
+        $foreignTopic = $otherCampaign->journalTopics()->create([
+            'created_by' => $otherDm->id,
+            'title' => 'Segreti proibiti',
+        ]);
+        $foreignPage = $foreignTopic->pages()->create([
+            'author_id' => $otherDm->id,
+            'title' => 'Pagina segreta',
+            'content' => 'Questo testo non deve cambiare.',
+        ]);
+
+        $this->actingAs($player)
+            ->patch(route('journal-pages.update', $foreignPage), [
+                'title' => 'Titolo sottratto',
+                'content' => 'Intrusione.',
+                'occurred_on' => null,
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseHas('journal_pages', [
+            'id' => $foreignPage->id,
+            'title' => 'Pagina segreta',
+            'content' => 'Questo testo non deve cambiare.',
+        ]);
+    }
+
     public function test_player_cannot_add_pages_to_another_campaign_topic(): void
     {
         [, $player] = $this->campaignWithTwoPlayers();

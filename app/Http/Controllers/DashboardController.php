@@ -53,6 +53,10 @@ class DashboardController extends Controller
             ->orderBy('title')
             ->get();
 
+        $galleryImages = $campaign->galleryImages()
+            ->latest()
+            ->get();
+
         $activity = $campaign->activityLogs()
             ->with('user:id,name')
             ->latest()
@@ -67,6 +71,17 @@ class DashboardController extends Controller
             'inventory' => $inventory,
             'relics' => $relics,
             'journalTopics' => $journalTopics,
+            'galleryImages' => $galleryImages,
+            'rationCount' => $campaign->ration_count,
+            'characterSheet' => $selectedCharacter ? [
+                'character_id' => $selectedCharacter->id,
+                'character_name' => $selectedCharacter->name,
+                'url' => route('character-sheets.show', $selectedCharacter).'?v='.($selectedCharacter->character_sheet_updated_at?->timestamp ?? 0),
+                'download_url' => route('character-sheets.download', $selectedCharacter),
+                'save_url' => route('character-sheets.update', $selectedCharacter),
+                'can_edit' => $selectedCharacter->user_id === $user->id,
+                'updated_at' => $selectedCharacter->character_sheet_updated_at,
+            ] : null,
             'activity' => $activity,
         ]);
     }
